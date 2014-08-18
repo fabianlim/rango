@@ -39,11 +39,13 @@ def populate():
 
     add_page(cat=frame_cat,
             title="Bottle",
-            url="http://bottlepy.org/docs/dev/")
+            url="http://bottlepy.org/docs/dev/",
+            views=6)
 
     add_page(cat=frame_cat,
             title="Flask",
-            url="http://flask.pocoo.org")
+            url="http://flask.pocoo.org",
+            views=10)
 
     # Print out what we have added to the user.
     for c in Category.objects.all():
