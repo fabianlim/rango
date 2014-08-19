@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+
+{% extends 'rango/base.html' %}
+
+{% block body_block %}
+<div class="hero-unit">
+    <h1>User Profile</h1>
+    <br />
+
+    <div class="container">
+        {% if user.is_authenticated %}
+            username: {{ user.username }} <br />
+            email: {{ user.email}} <br />
+            website: {{ user_profile.website}} <br />
+        {% else %}
+            <p>Please register for an account</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

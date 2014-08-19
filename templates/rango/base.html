@@ -42,9 +42,21 @@
             <div class="row-fluid">
                 <div class="span3">
                     <div class="well sidebar-nav">
-                        <ul class="nav nav-list">
-                          {% include "rango/category_list.html" %}
-                    </div>
+                      <!-- {% include "rango/category_list.html" %} -->
+
+                      <ul class="nav nav-list">
+                          <li class="nav-header">Find a Category</li>
+                          <form>
+                              <label></label>
+                              <li><input  class="search-query span10" type="text" name="suggestion" value="" id="suggestion" /></li>
+                          </form>
+                      </ul>
+                      {% if cat_list %}
+                      <div id="cats">
+                          {% include 'rango/category_list.html' with cat_list=cat_list %}
+                      </div>
+                      {% endif %}
+                  </div>
                     <!--/.well -->
                 </div>
                 <!--/span-->
@@ -71,11 +83,11 @@
                 <li><a href="/rango/login/">Login</a></li>
             {% endif %}
                 <li><a href="/rango/about/">About</a></li>
-                <li><a href="/rango/search/">Search</a></li>
             </ul>
         </div>
         <script src="{% static 'js/jquery-2.1.1.js' %}"></script>
         <script src="{% static 'js/bootstrap.min.js' %}"></script>
+        <script src="{% static "js/rango-ajax.js" %}"></script>
     </body>
 
     <footer>

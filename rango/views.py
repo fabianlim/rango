@@ -1,19 +1,22 @@
 # Create your views here.
 from django.http import HttpResponseRedirect, HttpResponse
 from django.template import RequestContext
-from django.shortcuts import render_to_response
+from django.shortcuts import render_to_response, redirect
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 
 # import the Category and Page models
-from rango.models import Category, Page
+from rango.models import Category, Page, UserProfile
 
 # import the forms
 from rango.forms import CategoryForm, PageForm, UserForm, UserProfileForm
 
 # datetime
 from datetime import datetime
+
+# for running a bing query
+from rango.bing_search import run_query
 
 def encode_url(category_name):
     return category_name.replace(' ', '_')
@@ -74,6 +77,9 @@ def category(request, category_name_url):
     # Request our context from the request passed to us
     context = RequestContext(request)
 
+    # extra context for displaying in sidebar
+    cat_list = get_category_list()
+
     # Change underscores in the category name to spaces.
     # URLS don't handle spaces well, so we encode them as undersores
     # We can then simply replace the underscores with spaces again to get the name
@@ -81,7 +87,7 @@ def category(request, category_name_url):
 
     # Create a context dictionary which we can pass to the template rendering engine
     # We start by containing the name of the category passed by the user
-    context_dict = {'category_name': category_name}
+    context_dict = {'cat_list': cat_list, 'category_name': category_name}
 
     try:
         # Can we find a category with the given name?
@@ -99,10 +105,22 @@ def category(request, category_name_url):
         # We also add the category object from the database to the context dictionary
         # We'll use this in the template to verify that the category exists
         context_dict['category'] = category
-        context_dict['cat_list'] = get_category_list() # to display in sidebar
 
         # add this?
         context_dict['category_name_url'] = category_name_url
+
+        if request.method == 'POST':
+            try:
+                query = request.POST['query'].strip()
+
+                if query:
+                    # Run our Bing function to get the results list!
+                    result_list = run_query(query)
+
+                # need to add the result_list in context
+                context_dict['result_list'] = result_list
+            except:
+                pass
 
     except Category.DoesNotExist:
         # We get here if we didn't find the specified category
@@ -112,6 +130,23 @@ def category(request, category_name_url):
 
     # Go render the response and return it to the client
     return render_to_response('rango/category.html', context_dict, context)
+
+@login_required
+def like_category(request):
+    context = RequestContext(request)
+    cat_id = None
+    if request.method == 'GET':
+        cat_id = request.GET['category_id']
+
+    likes = 0
+    if cat_id:
+        category = Category.objects.get(id=int(cat_id))
+        if category:
+            likes = category.likes + 1
+            category.likes =  likes
+            category.save()
+
+    return HttpResponse(likes)
 
 def add_category(request):
     # Get the context from the request.
@@ -310,17 +345,78 @@ def user_logout(request):
     # Take the user back to the homepage.
     return HttpResponseRedirect('/rango/')
 
-from rango.bing_search import run_query
-def search(request):
+def profile(request):
     context = RequestContext(request)
-    result_list = []
 
-    if request.method == 'POST':
-        query = request.POST['query'].strip()
+    if request.user.is_authenticated():
+        return render_to_response('rango/profile.html', {'user_profile':
+            request.user.userprofile}, context)
+    else:
+        return render_to_response('rango/profile.html', {}, context) #empty profile
 
-        if query:
-            # Run our Bing function to get the results list!
-            result_list = run_query(query)
+def track_url(request):
+    context = RequestContext(request)
+    page_id = None
+    url = '/rango/'
+    if request.method == 'GET':
+        if 'page_id' in request.GET:
+            page_id = request.GET['page_id']
+            try:
+                page = Page.objects.get(id=page_id)
+                page.views = page.views + 1
+                page.save()
+                url = page.url
+            except:
+                pass
 
-    return render_to_response('rango/search.html', {'result_list': result_list}, context)
+    return redirect(url)
+
+def get_category_list(max_results=0, starts_with=''):
+        cat_list = []
+        if starts_with:
+                cat_list = Category.objects.filter(name__istartswith=starts_with)
+        else:
+                cat_list = Category.objects.all()
+
+        if max_results > 0:
+                if len(cat_list) > max_results:
+                        cat_list = cat_list[:max_results]
+
+        for cat in cat_list:
+                cat.url = encode_url(cat.name)
+
+        return cat_list
+
+def suggest_category(request):
+        context = RequestContext(request)
+        cat_list = []
+        starts_with = ''
+        if request.method == 'GET':
+                starts_with = request.GET['suggestion']
+
+        cat_list = get_category_list(8, starts_with)
+
+        return render_to_response('rango/category_list.html', {'cat_list': cat_list }, context)
+
+@login_required
+def auto_add_page(request):
+    context = RequestContext(request)
+    cat_id = None
+    url = None
+    title = None
+    context_dict = {}
+    if request.method == 'GET':
+        cat_id = request.GET['category_id']
+        url = request.GET['url']
+        title = request.GET['title']
+        if cat_id:
+            category = Category.objects.get(id=int(cat_id))
+            p = Page.objects.get_or_create(category=category, title=title, url=url)
+
+            pages = Page.objects.filter(category=category).order_by('-views')
+
+            # Adds our results list to the template context under name pages.
+            context_dict['pages'] = pages
+
+    return render_to_response('rango/page_list.html', context_dict, context)
 
